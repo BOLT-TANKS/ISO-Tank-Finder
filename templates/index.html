@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ISO Tank Finder</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Find Your Suitable ISO Tank</h1>
+    <form id="cargoForm">
+        Name: <input type="text" name="name" required><br>
+        Email: <input type="email" name="email" required><br>
+        Phone: <input type="tel" name="phone" required><br>
+        Cargo (UN No. or Name): <input type="text" name="cargo" required><br>
+        <button type="submit">Submit</button>
+    </form>
+
+    <div id="popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:white; padding:20px; border:1px solid black;">
+        <p id="popup-content"></p>
+        <button onclick="$('#popup').hide();">Close</button>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $("#cargoForm").submit(function(event) {
+                event.preventDefault();
+
+                $.ajax({
+                    type: "POST",
+                    url: "/",
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        $("#popup-content").html("Suitable ISO Tank: " + response.tank_type + "<br>Contact Details: " + JSON.stringify(response.contact_details));
+                        $("#popup").show();
+                    },
+                    error: function(error) {
+                        $("#popup-content").text("Error: " + error);
+                        $("#popup").show();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
