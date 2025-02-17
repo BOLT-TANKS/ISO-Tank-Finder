@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, jsonify
 import pandas as pd
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # Load the Excel data
 try:
