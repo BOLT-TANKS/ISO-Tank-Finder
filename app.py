@@ -8,6 +8,7 @@ CORS(app)  # Enable CORS for all routes
 # Load the Excel data
 try:
     df = pd.read_excel("ISO_Tank_Finder.xlsx")  # Make sure this file is in the same directory
+    df["Cargo Name"] = df["Cargo Name"].str.strip()  # Remove any leading/trailing spaces
 except FileNotFoundError:
     print("Error: ISO_Tank_Finder.xlsx not found. Ensure it's in the same directory.")
     exit()
@@ -39,7 +40,12 @@ def index():
                 tank_type = "Cargo not found in database."
         except ValueError:
             # ✅ **CHANGE 3: Handle invalid input (non-numeric values)**
-            tank_type = "Invalid cargo input. Please provide a valid UN number."
+            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
+
+            if not tank_data.empty:
+                tank_type = tank_data.iloc[0]
+            else:
+                tank_type = "Cargo not found in database."
 
         return jsonify({"tank_type": tank_type, "contact_details": contact_details})
 
