@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import pandas as pd
 from flask_cors import CORS
 import requests
-import numpy as np # Import numpy
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -10,6 +10,7 @@ CORS(app)
 try:
     df = pd.read_excel("ISO_Tank_Finder.xlsx")
     df["Cargo Name"] = df["Cargo Name"].str.strip()
+    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()  # Ensure tank types are stripped
 except FileNotFoundError:
     print("Error: ISO_Tank_Finder.xlsx not found.")
     exit()
@@ -69,11 +70,12 @@ def index():
             else:
                 tank_type = None
 
-        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)): #added this line.
+        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
             message = f"We couldn't determine the best-suited ISO Tank for {cargo_input}. Team BOLT will get back to you soon on the suitable ISO Tank for {cargo_input}."
             response_data = {"tank_type": message, "contact_details": contact_details}
         else:
             tank_type_str = str(tank_type)
+            print(f"Tank Type: {tank_type_str}") # Debugging print
             response_data = {"tank_type": tank_type_str, "contact_details": contact_details}
             if tank_type_str in tank_permitted and tank_permitted[tank_type_str]:
                 response_data["portable_tank_instructions"] = f"Portable tank instructions also permitted: {tank_permitted[tank_type_str]}"
