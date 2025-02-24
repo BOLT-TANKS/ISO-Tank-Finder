@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import pandas as pd
 from flask_cors import CORS
 import requests
+import numpy as np # Import numpy
 
 app = Flask(__name__)
 CORS(app)
@@ -68,7 +69,7 @@ def index():
             else:
                 tank_type = None
 
-        if tank_type is None:
+        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)): #added this line.
             message = f"We couldn't determine the best-suited ISO Tank for {cargo_input}. Team BOLT will get back to you soon on the suitable ISO Tank for {cargo_input}."
             response_data = {"tank_type": message, "contact_details": contact_details}
         else:
