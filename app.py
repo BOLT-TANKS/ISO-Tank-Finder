@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify, redirect
 import pandas as pd
 from flask_cors import CORS
 import requests
-import numpy as np
 import logging
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -21,27 +21,32 @@ except FileNotFoundError:
     logging.error("Error: ISO_Tank_Finder.xlsx not found.")
     exit()
 
-# OAuth credentials for Zoho
-CLIENT_ID = "1000.83BH88U2AT9NPAO0T8KSB4PP7347TT"
-CLIENT_SECRET = "aa75e24d3f2171f268b04fa00110a7f1cefa860fbe"
+# OAuth credentials for Zoho Campaigns (Using Environment Variables)
+CLIENT_ID = os.environ.get("ZOHO_CLIENT_ID")
+CLIENT_SECRET = os.environ.get("ZOHO_CLIENT_SECRET")
 REDIRECT_URI = "https://iso-tank-finder.onrender.com/oauth/callback"
+ZOHO_ACCOUNTS_URL = "https://accounts.zoho.in/oauth/v2/auth" # Use .in for India
+ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token" # Use .in for India
 
 @app.route("/zoho/oauth")
 def zoho_oauth():
+    scopes = "ZohoCampaigns.contact.create,ZohoCampaigns.lists.all" # Start with minimal scopes
     auth_url = (
-        "https://accounts.zoho.com/oauth/v2/auth?"
-        f"response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope=ZohoCRM.modules.ALL"
+        f"{ZOHO_ACCOUNTS_URL}?"
+        f"response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope={scopes}"
     )
+    logging.info(f"Authorization URL: {auth_url}")
     return redirect(auth_url)
 
 @app.route("/oauth/callback")
 def oauth_callback():
     try:
+        logging.info(f"Callback request args: {request.args}") #Log request arguments.
         code = request.args.get("code")
+        logging.info(f"Authorization code: {code}") #Log auth code.
         if not code:
             return jsonify({"error": "Authorization code not found"}), 400
 
-        token_url = "https://accounts.zoho.com/oauth/v2/token"
         data = {
             "grant_type": "authorization_code",
             "client_id": CLIENT_ID,
@@ -50,8 +55,12 @@ def oauth_callback():
             "code": code,
         }
 
-        response = requests.post(token_url, data=data)
+        logging.info(f"Token request data: {data}") #Log the data being sent.
+        response = requests.post(ZOHO_TOKEN_URL, data=data)
+        logging.info(f"Token response status code: {response.status_code}") #Log response status.
+        logging.info(f"Token response text: {response.text}") #Log response text.
         token_data = response.json()
+        logging.info(f"Token response json: {token_data}") #Log response json.
 
         if "access_token" in token_data:
             logging.info("Zoho OAuth Successful")
