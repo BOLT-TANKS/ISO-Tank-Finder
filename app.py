@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect
+from flask import Flask, request, jsonify
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -10,16 +10,6 @@ app = Flask(__name__)
 
 # Enable logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# Load Excel Data (Optional)
-try:
-    df = pd.read_excel("ISO_Tank_Finder.xlsx")
-    df["Cargo Name"] = df["Cargo Name"].str.strip()
-    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
-    logging.info("Excel file loaded successfully.")
-except FileNotFoundError:
-    logging.error("Error: ISO_Tank_Finder.xlsx not found.")
-    df = None  # Set to None if file not found
 
 # Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -52,19 +42,25 @@ def add_lead():
     """Receive a new lead and store it in Google Sheets."""
     try:
         data = request.json
-        name = data.get("name")
-        email = data.get("email")
-        company = data.get("company")
-        cargo = data.get("cargo")
 
-        if not all([name, email, company, cargo]):
+        # Required fields
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        contact_number = data.get("contact_number")
+        email = data.get("email")
+        location = data.get("location")
+        cargo = data.get("cargo")
+        tank_type = data.get("tank_type")
+
+        # Validate input
+        if not all([first_name, last_name, contact_number, email, location, cargo, tank_type]):
             return jsonify({"error": "Missing required fields"}), 400
 
         # Add data to Google Sheets
-        sheet.append_row([name, email, company, cargo])
+        sheet.append_row([first_name, last_name, contact_number, email, location, cargo, tank_type])
 
         # Send Email Notification
-        send_email(name, email, company, cargo)
+        send_email(first_name, last_name, email, cargo, tank_type)
 
         return jsonify({"message": "Lead added successfully!"}), 200
 
@@ -72,11 +68,17 @@ def add_lead():
         logging.error(f"Error adding lead: {e}")
         return jsonify({"error": "Failed to add lead"}), 500
 
-def send_email(name, email, company, cargo):
+def send_email(first_name, last_name, email, cargo, tank_type):
     """Send an automated email using Brevo SMTP."""
     try:
         subject = "Thank You for Your Inquiry"
-        body = f"Hello {name},\n\nThank you for your inquiry regarding {cargo}. Our team will reach out to you soon.\n\nBest Regards,\nBOLT Team"
+        body = f"""Hello {first_name} {last_name},
+
+Thank you for your inquiry regarding {cargo} and {tank_type}. Our team will reach out to you soon.
+
+Best Regards,  
+BOLT Team
+"""
 
         message = f"Subject: {subject}\n\n{body}"
 
