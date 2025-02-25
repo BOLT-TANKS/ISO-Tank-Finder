@@ -71,7 +71,7 @@ def index():
                 tank_type = None
 
         if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
-            message = f"We couldn't determine the best-suited ISO Tank for {cargo_input}. Team BOLT will get back to you soon on the suitable ISO Tank for {cargo_input}."
+            message = f"Not Found Team BOLT will get back to you shortly."
             response_data = {"tank_type": message, "contact_details": contact_details}
         else:
             tank_type_str = str(tank_type)
