@@ -26,8 +26,8 @@ except FileNotFoundError:
 CLIENT_ID = os.environ.get("ZOHO_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("ZOHO_CLIENT_SECRET")
 REDIRECT_URI = "https://iso-tank-finder.onrender.com/oauth/callback"
-ZOHO_ACCOUNTS_URL = "https://accounts.zoho.in/oauth/v2/auth"  # Use .in for India
-ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token"  # Use .in for India
+ZOHO_ACCOUNTS_URL = "https://accounts.zoho.in/oauth/v2/auth"
+ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token"
 
 # Ensure credentials exist
 if not CLIENT_ID or not CLIENT_SECRET:
@@ -36,7 +36,8 @@ if not CLIENT_ID or not CLIENT_SECRET:
 
 @app.route("/zoho/oauth")
 def zoho_oauth():
-    scopes = "ZohoCampaigns.contact.CREATE,ZohoCampaigns.lists.READ"  # Updated scope with uppercase actions
+    # Corrected Scope
+    scopes = "ZohoCampaigns.contacts.CREATE,ZohoCampaigns.lists.READ"
     encoded_scopes = urllib.parse.quote(scopes)  # URL encode the scope
 
     auth_url = (
@@ -44,7 +45,8 @@ def zoho_oauth():
         f"response_type=code&"
         f"client_id={CLIENT_ID}&"
         f"redirect_uri={REDIRECT_URI}&"
-        f"scope={encoded_scopes}"
+        f"scope={encoded_scopes}&"
+        f"access_type=offline"
     )
 
     logging.info(f"Authorization URL: {auth_url}")
@@ -53,14 +55,14 @@ def zoho_oauth():
 @app.route("/oauth/callback")
 def oauth_callback():
     try:
-        logging.info(f"Callback request args: {request.args}")  # Log request arguments
+        logging.info(f"Callback request args: {request.args}")
         code = request.args.get("code")
 
         if not code:
             logging.error("Authorization code not found in callback response.")
             return jsonify({"error": "Authorization code not found"}), 400
 
-        logging.info(f"Received Authorization Code: {code}")  # Log auth code
+        logging.info(f"Received Authorization Code: {code}")
 
         data = {
             "grant_type": "authorization_code",
@@ -70,11 +72,11 @@ def oauth_callback():
             "code": code,
         }
 
-        logging.info(f"Requesting access token from Zoho...")  # Log before making request
+        logging.info("Requesting access token from Zoho...")
         response = requests.post(ZOHO_TOKEN_URL, data=data)
 
-        logging.info(f"Token response status: {response.status_code}")  # Log response status
-        logging.info(f"Token response text: {response.text}")  # Log response text for debugging
+        logging.info(f"Token response status: {response.status_code}")
+        logging.info(f"Token response text: {response.text}")
 
         token_data = response.json()
 
