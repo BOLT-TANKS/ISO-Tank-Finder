@@ -1,96 +1,68 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 import pandas as pd
 from flask_cors import CORS
 import requests
 import numpy as np
+import logging
 
 app = Flask(__name__)
 CORS(app)
 
+# Enable logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Load Excel Data
 try:
     df = pd.read_excel("ISO_Tank_Finder.xlsx")
     df["Cargo Name"] = df["Cargo Name"].str.strip()
-    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()  # Ensure tank types are stripped
+    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
+    logging.info("Excel file loaded successfully.")
 except FileNotFoundError:
-    print("Error: ISO_Tank_Finder.xlsx not found.")
+    logging.error("Error: ISO_Tank_Finder.xlsx not found.")
     exit()
 
-tank_permitted = {
-    "T1": "T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T2": "T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T3": "T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T4": "T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T5": "T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T6": "T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T7": "T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T8": "T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T9": "T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T10": "T11, T19, T20, T21, T22",
-    "T12": "T14, T16, T18, T19, T20, T21, T22",
-    "T13": "T19, T20, T21, T22",
-    "T15": "T16, T17, T18, T19, T20, T21, T22",
-    "T16": "T17, T18, T19, T20, T21, T22",
-    "T17": "T18, T19, T20, T21, T22",
-    "T18": "T19, T20, T21, T22",
-    "T19": "T20, T22",
-    "T20": "T22",
-    "T21": "T22",
-    "T22": ""
-}
+# OAuth credentials for Zoho
+CLIENT_ID = "1000.83BH88U2AT9NPAO0T8KSB4PP7347TT"
+CLIENT_SECRET = "aa75e24d3f2171f268b04fa00110a7f1cefa860fbe"
+REDIRECT_URI = "https://iso-tank-finder.onrender.com/oauth/callback"
 
-@app.route("/", methods=["POST"])
-def index():
+@app.route("/zoho/oauth")
+def zoho_oauth():
+    auth_url = (
+        "https://accounts.zoho.com/oauth/v2/auth?"
+        f"response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope=ZohoCRM.modules.ALL"
+    )
+    return redirect(auth_url)
+
+@app.route("/oauth/callback")
+def oauth_callback():
     try:
-        data = request.get_json()
-        cargo_input = data.get("cargo")
-        print(f"Received cargo input: {cargo_input}")
+        code = request.args.get("code")
+        if not code:
+            return jsonify({"error": "Authorization code not found"}), 400
 
-        if not cargo_input:
-            return jsonify({"error": "Cargo input is required"}), 400
-
-        contact_details = {
-            "name": data.get("name", ""),
-            "email": data.get("email", ""),
-            "phone": data.get("phone", "")
+        token_url = "https://accounts.zoho.com/oauth/v2/token"
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "redirect_uri": REDIRECT_URI,
+            "code": code,
         }
 
-        try:
-            un_number = int(cargo_input)
-            tank_data = df.loc[df["UN No."] == un_number, "ISO Tank Type"]
+        response = requests.post(token_url, data=data)
+        token_data = response.json()
 
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-            else:
-                tank_type = None
-        except ValueError:
-            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
-
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-            else:
-                tank_type = None
-
-        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
-            message = f"Not Found Team BOLT will get back to you shortly."
-            response_data = {"tank_type": message, "contact_details": contact_details}
+        if "access_token" in token_data:
+            logging.info("Zoho OAuth Successful")
+            return jsonify({"message": "OAuth successful", "token": token_data})
         else:
-            tank_type_str = str(tank_type)
-            print(f"Tank Type: {tank_type_str}") # Debugging print
-            response_data = {"tank_type": tank_type_str, "contact_details": contact_details}
-            if tank_type_str in tank_permitted and tank_permitted[tank_type_str]:
-                response_data["portable_tank_instructions"] = f"Portable tank instructions also permitted: {tank_permitted[tank_type_str]}"
-
-        # Send to FormBold
-        formbold_url = "https://formbold.com/s/oYkGv"
-        try:
-            requests.post(formbold_url, json=response_data)
-        except Exception as formbold_error:
-            print(f"FormBold error: {formbold_error}")
-
-        return jsonify(response_data)
+            logging.error(f"Zoho OAuth Error: {token_data}")
+            return jsonify({"error": "Failed to get access token", "details": token_data}), 400
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logging.error(f"OAuth Callback Error: {e}")
+        return jsonify({"error": "OAuth callback failed"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
