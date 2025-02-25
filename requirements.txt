@@ -4,3 +4,6 @@ openpyxl
 requests
 flask_cors
 gunicorn
+gspread
+oauth2client
+smtplib
