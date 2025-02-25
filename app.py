@@ -26,44 +26,40 @@ except FileNotFoundError:
 CLIENT_ID = os.environ.get("ZOHO_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("ZOHO_CLIENT_SECRET")
 REDIRECT_URI = "https://iso-tank-finder.onrender.com/oauth/callback"
-ZOHO_ACCOUNTS_URL = "https://accounts.zoho.in/oauth/v2/auth"
-ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token"
 
-# Ensure credentials exist
-if not CLIENT_ID or not CLIENT_SECRET:
-    logging.error("Missing Zoho OAuth credentials. Set ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET in environment variables.")
-    exit()
+# Change the region URL based on your Zoho Account (India, Global, EU)
+ZOHO_REGION = "in"  # Change to "com" (US) or "eu" (Europe) if needed
+ZOHO_ACCOUNTS_URL = f"https://accounts.zoho.{ZOHO_REGION}/oauth/v2/auth"
+ZOHO_TOKEN_URL = f"https://accounts.zoho.{ZOHO_REGION}/oauth/v2/token"
 
 @app.route("/zoho/oauth")
 def zoho_oauth():
-    # Corrected Scope
-    scopes = "ZohoCampaigns.contacts.CREATE,ZohoCampaigns.lists.READ"
-    encoded_scopes = urllib.parse.quote(scopes)  # URL encode the scope
-
+    # Correct OAuth Scopes
+    scopes = "ZohoCampaigns.contact.ALL,ZohoCampaigns.lists.READ"
+    encoded_scopes = urllib.parse.quote(scopes)  # Ensure URL encoding
+    
     auth_url = (
-        f"{ZOHO_ACCOUNTS_URL}?"
-        f"response_type=code&"
-        f"client_id={CLIENT_ID}&"
-        f"redirect_uri={REDIRECT_URI}&"
-        f"scope={encoded_scopes}&"
-        f"access_type=offline"
+        f"{ZOHO_ACCOUNTS_URL}?response_type=code"
+        f"&client_id={CLIENT_ID}"
+        f"&redirect_uri={REDIRECT_URI}"
+        f"&scope={encoded_scopes}"
+        f"&access_type=offline"  # Ensure refresh token is granted
     )
-
+    
     logging.info(f"Authorization URL: {auth_url}")
     return redirect(auth_url)
 
 @app.route("/oauth/callback")
 def oauth_callback():
     try:
-        logging.info(f"Callback request args: {request.args}")
+        logging.info(f"Callback request args: {request.args}")  # Log request arguments
         code = request.args.get("code")
-
+        
         if not code:
             logging.error("Authorization code not found in callback response.")
             return jsonify({"error": "Authorization code not found"}), 400
 
-        logging.info(f"Received Authorization Code: {code}")
-
+        # Exchange auth code for access token
         data = {
             "grant_type": "authorization_code",
             "client_id": CLIENT_ID,
@@ -72,24 +68,22 @@ def oauth_callback():
             "code": code,
         }
 
-        logging.info("Requesting access token from Zoho...")
+        logging.info(f"Token request data: {data}")  # Log token request data
         response = requests.post(ZOHO_TOKEN_URL, data=data)
-
-        logging.info(f"Token response status: {response.status_code}")
-        logging.info(f"Token response text: {response.text}")
-
         token_data = response.json()
 
+        logging.info(f"Token response: {token_data}")  # Log response
+
         if "access_token" in token_data:
-            logging.info("Zoho OAuth Successful. Access token received.")
+            logging.info("Zoho OAuth Successful")
             return jsonify({"message": "OAuth successful", "token": token_data})
         else:
-            logging.error(f"Failed to retrieve access token: {token_data}")
+            logging.error(f"Zoho OAuth Error: {token_data}")
             return jsonify({"error": "Failed to get access token", "details": token_data}), 400
 
     except Exception as e:
-        logging.exception("OAuth Callback Error")
-        return jsonify({"error": "OAuth callback failed", "details": str(e)}), 500
+        logging.error(f"OAuth Callback Error: {e}")
+        return jsonify({"error": "OAuth callback failed"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
