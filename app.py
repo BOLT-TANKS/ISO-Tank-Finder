@@ -1,149 +1,95 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import requests
-import os
-import json
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
 
-# Excel File Configuration
-EXCEL_FILE = "ISO_Tank_Finder.xlsx"
-
-# Google Sheets Configuration
-SHEET_ID = os.environ.get("SHEET_ID")
-CREDENTIALS_FILE = "credentials.json"
-
-# Brevo Configuration
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-
-# Retrieve the GitHub secret from GIST
-GIST_RAW_URL = os.environ.get("GOOGLE_CREDENTIALS_GIST_URL")
-
-if GIST_RAW_URL:
-    try:
-        response = requests.get(GIST_RAW_URL)
-        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-        credentials_json_string = response.text
-
-        # Parse the JSON string
-        credentials_json = json.loads(credentials_json_string)
-
-        # Save the JSON data to a file
-        with open("credentials.json", "w") as f:
-            json.dump(credentials_json, f)
-
-        print("Credentials file created successfully from Gist.")
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching credentials from Gist: {e}")
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON from Gist: {e}")
-    except Exception as e:
-        print(f"Error writing credentials file from Gist: {e}")
-else:
-    print("GOOGLE_CREDENTIALS_GIST_URL environment variable not set.")
-
-# Initialize Google Sheets client
 try:
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).sheet1
-except Exception as e:
-    print(f"Error connecting to Google Sheets: {e}")
-    exit()
-
-# Load Excel File
-try:
-    df = pd.read_excel(EXCEL_FILE)
+    df = pd.read_excel("ISO_Tank_Finder.xlsx")
     df["Cargo Name"] = df["Cargo Name"].str.strip()
+    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
 except FileNotFoundError:
-    print(f"Error: {EXCEL_FILE} not found.")
+    print("Error: ISO_Tank_Finder.xlsx not found.")
     exit()
 
-def find_tank_type(cargo_input):
-    try:
-        un_number = int(cargo_input)
-        tank_data = df.loc[df["UN No."] == un_number, "ISO Tank Type"]
-        if not tank_data.empty:
-            return tank_data.iloc[0]
-        else:
-            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
-            if not tank_data.empty:
-                return tank_data.iloc[0]
-            else:
-                return "Cargo not found in database."
-    except ValueError:
-        tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
-        if not tank_data.empty:
-            return tank_data.iloc[0]
-        else:
-            return "Cargo not found in database."
-
-def send_email(to_email, subject, content):
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
-    }
-    payload = {
-        "sender": {"name": "ISO Tank Finder", "email": SENDER_EMAIL},
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "htmlContent": content,
-    }
-    response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
-    return response.status_code
+tank_permitted = {
+    "T1": "T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T2": "T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T3": "T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T4": "T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T5": "T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T6": "T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T7": "T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T8": "T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T9": "T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    "T10": "T11, T19, T20, T21, T22",
+    "T12": "T14, T16, T18, T19, T20, T21, T22",
+    "T13": "T19, T20, T21, T22",
+    "T15": "T16, T17, T18, T19, T20, T21, T22",
+    "T16": "T17, T18, T19, T20, T21, T22",
+    "T17": "T18, T19, T20, T21, T22",
+    "T18": "T19, T20, T21, T22",
+    "T19": "T20, T22",
+    "T20": "T22",
+    "T21": "T22",
+}
 
 @app.route("/", methods=["POST"])
 def index():
     try:
         data = request.get_json()
         cargo_input = data.get("cargo")
-        first_name = data.get("firstName", "")
-        last_name = data.get("lastName", "")
-        contact_number = data.get("contactNumber", "")
-        email = data.get("email", "")
-        location = data.get("location", "")
+        print(f"Received cargo input: {cargo_input}")
 
         if not cargo_input:
             return jsonify({"error": "Cargo input is required"}), 400
 
-        tank_type = find_tank_type(cargo_input)
         contact_details = {
-            "firstName": first_name,
-            "lastName": last_name,
-            "contactNumber": contact_number,
-            "email": email,
-            "location": location,
-            "cargo": cargo_input,
-            "tankType": tank_type
+            "name": data.get("name", ""),
+            "email": data.get("email", ""),
+            "phone": data.get("phone", "")
         }
 
-        # Send email
-        if email:
-            subject = "ISO Tank Finder Result"
-            content = f"Hello {first_name} {last_name},\n\nYour requested tank type for {cargo_input} is: {tank_type}.\n\nContact Details:\nFirst Name: {first_name}\nLast Name: {last_name}\nContact Number: {contact_number}\nEmail: {email}\nLocation: {location}\nCargo: {cargo_input}\nTank Type: {tank_type}"
-            status_code = send_email(email, subject, content)
-            if status_code == 201:
-                print(f"Email sent successfully to {email}")
-            else:
-                print(f"Failed to send email to {email}. Status code: {status_code}")
-
-        # Append data to Google Sheet
         try:
-            sheet.append_row([first_name, last_name, contact_number, email, location, cargo_input, tank_type])
-            print("Data appended to Google Sheet.")
-        except Exception as e:
-            print(f"Error appending data to Google Sheet: {e}")
+            un_number = int(cargo_input)
+            tank_data = df.loc[df["UN No."] == un_number, "ISO Tank Type"]
 
-        return jsonify({"tank_type": tank_type, "contact_details": contact_details})
+            if not tank_data.empty:
+                tank_type = tank_data.iloc[0]
+            else:
+                tank_type = None
+        except ValueError:
+            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
+
+            if not tank_data.empty:
+                tank_type = tank_data.iloc[0]
+            else:
+                tank_type = None
+
+        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
+            response_data = {"tank_type": "Cargo Not Found", "contact_details": contact_details}
+        else:
+            tank_type_str = str(tank_type)
+            print(f"Tank Type: {tank_type_str}")
+            response_data = {"tank_type": tank_type_str, "contact_details": contact_details}
+
+            if tank_type_str in tank_permitted:
+                response_data["portable_tank_instructions"] = f"Tank Type also permitted: {tank_permitted[tank_type_str]}"
+
+        # Send to FormBold
+        formbold_url = "https://formbold.com/s/oYkGv"
+        try:
+            requests.post(formbold_url, json=response_data)
+        except Exception as formbold_error:
+            print(f"FormBold error: {formbold_error}")
+
+        return jsonify(response_data)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+if __name__ == "__main__":
+    app.run(debug=True)
