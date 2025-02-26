@@ -118,9 +118,3 @@ def index():
             tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
 
             if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-            else:
-                tank_type = None
-
-        if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
-            response_data = {"tank_type": "Cargo Not Found", "
