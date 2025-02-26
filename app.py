@@ -22,12 +22,15 @@ BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 
-# Retrieve the GitHub secret
-credentials_json_string = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+# Retrieve the GitHub secret from GIST
+GIST_RAW_URL = os.environ.get("GOOGLE_CREDENTIALS_GIST_URL")
 
-# Check if the secret was retrieved successfully
-if credentials_json_string:
+if GIST_RAW_URL:
     try:
+        response = requests.get(GIST_RAW_URL)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+        credentials_json_string = response.text
+
         # Parse the JSON string
         credentials_json = json.loads(credentials_json_string)
 
@@ -35,14 +38,16 @@ if credentials_json_string:
         with open("credentials.json", "w") as f:
             json.dump(credentials_json, f)
 
-        print("Credentials file created successfully.")
+        print("Credentials file created successfully from Gist.")
 
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching credentials from Gist: {e}")
     except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
+        print(f"Error decoding JSON from Gist: {e}")
     except Exception as e:
-        print(f"Error writing credentials file: {e}")
+        print(f"Error writing credentials file from Gist: {e}")
 else:
-    print("GOOGLE_CREDENTIALS_JSON secret not found.")
+    print("GOOGLE_CREDENTIALS_GIST_URL environment variable not set.")
 
 # Initialize Google Sheets client
 try:
