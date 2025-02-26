@@ -20,11 +20,11 @@ CORS(app)
 
 try:
 
-    df = pd.read_excel("ISO_Tank_Finder.xlsx")
+   df = pd.read_excel("ISO_Tank_Finder.xlsx")
 
-    df["Cargo Name"] = df["Cargo Name"].str.strip()
+   df["Cargo Name"] = df["Cargo Name"].str.strip()
 
-    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
+   df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
 
 except FileNotFoundError:
 
