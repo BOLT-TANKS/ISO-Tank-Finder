@@ -130,4 +130,4 @@ def index():
         try:
             requests.post(formbold_url, json=response_data)
         except Exception as formbold_error:
-            print(f"
+            print(f"FormBold error: {formbold_error}")
