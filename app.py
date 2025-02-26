@@ -8,119 +8,59 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Load your Excel file (adjust the path if needed)
-excel_file_path = "ISO_Tank_Finder.xlsx"  # Replace with your Excel file path
-df = pd.read_excel(excel_file_path)
+try:
+    df = pd.read_excel("ISO_Tank_Finder.xlsx")
+    df["Cargo Name"] = df["Cargo Name"].str.strip()
+    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
+except FileNotFoundError:
+    print("Error: ISO_Tank_Finder.xlsx not found.")
+    exit()
 
 tank_permitted = {
-    "T11": "T14",
-    "T14": "T50",
-    "T50": "T75"
+    "T1": "T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
+    # ... your tank_permitted dictionary ...
 }
 
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/templates/send"
-SENDER_EMAIL = "info@bolttanks.com"  # Replace with your sender email
-BREVO_TEMPLATE_ID = 1  # Using Template ID 1
+BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+SENDER_EMAIL = "your_sender_email@example.com"  # Replace with your sender email
 
-def send_brevo_template_email(to_email, first_name, cargo_name, tank_type):
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
-    }
-    payload = {
-        "templateId": BREVO_TEMPLATE_ID,
-        "sender": {"name": "ISO Tank Finder", "email": SENDER_EMAIL},
-        "to": [{"email": to_email}],
-        "params": {
-            "First Name": first_name,
-            "Cargo Name": cargo_name,
-            "Tank Type": tank_type,
-        },
-    }
-    try:
-        response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
-        response.raise_for_status()
-        print(f"Email sent successfully to {to_email}")
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to send email to {to_email}. Error: {e}")
+def send_brevo_email(to_email, subject, content):
+    # ... your send_brevo_email function ...
 
-def test_brevo_send():
-    to_email = "test@example.com" #replace with a test email.
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
-    }
-    payload = {
-        "templateId": BREVO_TEMPLATE_ID,
-        "sender": {"name": "Test Sender", "email": SENDER_EMAIL},
-        "to": [{"email": to_email}],
-        "params": {
-            "First Name": "Test Name",
-            "Cargo Name": "Test Cargo",
-            "Tank Type": "Test Tank",
-        },
-    }
+def append_to_excel(data):
     try:
-        response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
-        response.raise_for_status()
-        print(f"Test Email sent successfully to {to_email}")
-    except requests.exceptions.RequestException as e:
-        print(f"Test Failed to send email to {to_email}. Error: {e}")
+        new_row = pd.DataFrame([data])
+        global df
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_excel("ISO_Tank_Finder.xlsx", index=False)
+        print("Data appended to Excel successfully.")
+    except Exception as e:
+        print(f"Failed to append data to Excel. Error: {e}")
 
 @app.route("/", methods=["POST"])
 def index():
     try:
         data = request.get_json()
-        cargo_input = data.get("cargo")
-        print(f"Received cargo input: {cargo_input}")
-
-        if not cargo_input:
-            return jsonify({"error": "Cargo input is required"}), 400
-
-        contact_details = {
-            "name": data.get("name", ""),
-            "email": data.get("email", ""),
-            "phone": data.get("phone", "")
-        }
-
-        try:
-            un_number = int(cargo_input)
-            tank_data = df.loc[df["UN No."] == un_number, "ISO Tank Type"]
-
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-            else:
-                tank_type = None
-        except ValueError:
-            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
-
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-            else:
-                tank_type = None
+        # ... your cargo lookup logic ...
 
         if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
-            response_data = {"tank_type": "Cargo Not Found", "contact_details": contact_details}
+            # ... your "Cargo Not Found" response ...
         else:
-            tank_type_str = str(tank_type)
-            print(f"Tank Type: {tank_type_str}")
-            response_data = {"tank_type": tank_type_str, "contact_details": contact_details}
+            # ... your tank_type response ...
 
-            if tank_type_str in tank_permitted:
-                response_data["portable_tank_instructions"] = f"Tank Type also permitted: {tank_permitted[tank_type_str]}"
             if contact_details.get("email"):
-                first_name = contact_details.get("name", "User")
-                send_brevo_template_email(contact_details["email"], first_name, cargo_input, tank_type_str)
+                # ... your email sending logic ...
 
-        # Send to FormBold
-        formbold_url = "https://formbold.com/s/oYkGv"
-        try:
-            requests.post(formbold_url, json=response_data)
-        except Exception as formbold_error:
-            print(f"FormBold error: {formbold_error}")
+            append_to_excel({
+                "Cargo": cargo_input,
+                "Tank Type": tank_type_str,
+                "Name": contact_details.get("name", ""),
+                "Email": contact_details.get("email", ""),
+                "Phone": contact_details.get("phone", "")
+            })
+
+        # ... your FormBold logic ...
 
         return jsonify(response_data)
 
@@ -128,5 +68,4 @@ def index():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
-    test_brevo_send() #run the test.
-    app.run(debug=False) #debug should be false in production.
+    app.run(debug=False) #debug = False for production.
