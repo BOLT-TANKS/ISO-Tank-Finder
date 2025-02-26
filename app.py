@@ -42,13 +42,13 @@ tank_permitted = {
 
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
-SENDER_EMAIL = "info@bolttanks.com"  # Updated sender email
+SENDER_EMAIL = "info@bolttanks.com"
 
 # Google Sheets Configuration
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-CREDENTIALS_FILE = "your-service-account-credentials.json"  # Replace with your credentials file name
+CREDENTIALS_FILE = "your-service-account-credentials.json"
 SPREADSHEET_ID = "1geFLxGjdEUUj2Ua9VDhDlQeDLDg-ZNuErz7KId-8_yY"
-WORKSHEET_NAME = "Sheet1"  # Replace with your worksheet name
+WORKSHEET_NAME = "Sheet1"
 
 def send_brevo_email(to_email, subject, content):
     headers = {
@@ -123,6 +123,4 @@ def index():
                 tank_type = None
 
         if tank_type is None or (isinstance(tank_type, float) and np.isnan(tank_type)):
-            response_data = {"tank_type": "Cargo Not Found", "contact_details": contact_details}
-        else:
-            tank_type_str = str(tank_type)
+            response_data = {"tank_type": "Cargo Not Found", "
