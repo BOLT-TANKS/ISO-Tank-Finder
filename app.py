@@ -46,6 +46,30 @@ def send_brevo_template_email(to_email, first_name, cargo_name, tank_type):
     except requests.exceptions.RequestException as e:
         print(f"Failed to send email to {to_email}. Error: {e}")
 
+def test_brevo_send():
+    to_email = "test@example.com" #replace with a test email.
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+    payload = {
+        "templateId": BREVO_TEMPLATE_ID,
+        "sender": {"name": "Test Sender", "email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "params": {
+            "First Name": "Test Name",
+            "Cargo Name": "Test Cargo",
+            "Tank Type": "Test Tank",
+        },
+    }
+    try:
+        response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
+        response.raise_for_status()
+        print(f"Test Email sent successfully to {to_email}")
+    except requests.exceptions.RequestException as e:
+        print(f"Test Failed to send email to {to_email}. Error: {e}")
+
 @app.route("/", methods=["POST"])
 def index():
     try:
@@ -104,4 +128,5 @@ def index():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    test_brevo_send() #run the test.
+    app.run(debug=False) #debug should be false in production.
