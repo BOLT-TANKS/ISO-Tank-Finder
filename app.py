@@ -3,39 +3,48 @@ from flask_cors import CORS
 import pandas as pd
 import requests
 import numpy as np
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-try:
-    df = pd.read_excel("ISO_Tank_Finder.xlsx")
-    df["Cargo Name"] = df["Cargo Name"].str.strip()
-    df["ISO Tank Type"] = df["ISO Tank Type"].str.strip()
-except FileNotFoundError:
-    print("Error: ISO_Tank_Finder.xlsx not found.")
-    exit()
+# Load your Excel file (adjust the path if needed)
+excel_file_path = "ISO Tank Data.xlsx"  # Replace with your Excel file path
+df = pd.read_excel(excel_file_path)
 
 tank_permitted = {
-    "T1": "T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T2": "T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T3": "T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T4": "T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T5": "T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T6": "T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T7": "T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T8": "T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T9": "T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T10": "T11, T19, T20, T21, T22",
-    "T12": "T14, T16, T18, T19, T20, T21, T22",
-    "T13": "T19, T20, T21, T22",
-    "T15": "T16, T17, T18, T19, T20, T21, T22",
-    "T16": "T17, T18, T19, T20, T21, T22",
-    "T17": "T18, T19, T20, T21, T22",
-    "T18": "T19, T20, T21, T22",
-    "T19": "T20, T22",
-    "T20": "T22",
-    "T21": "T22",
+    "T11": "T14",
+    "T14": "T50",
+    "T50": "T75"
 }
+
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/templates/send"
+SENDER_EMAIL = "info@bolttanks.com"  # Replace with your sender email
+BREVO_TEMPLATE_ID = 1  # Using Template ID 1
+
+def send_brevo_template_email(to_email, first_name, cargo_name, tank_type):
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+    payload = {
+        "templateId": BREVO_TEMPLATE_ID,
+        "sender": {"name": "ISO Tank Finder", "email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "params": {
+            "First Name": first_name,
+            "Cargo Name": cargo_name,
+            "Tank Type": tank_type,
+        },
+    }
+    try:
+        response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
+        response.raise_for_status()
+        print(f"Email sent successfully to {to_email}")
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to send email to {to_email}. Error: {e}")
 
 @app.route("/", methods=["POST"])
 def index():
@@ -78,6 +87,9 @@ def index():
 
             if tank_type_str in tank_permitted:
                 response_data["portable_tank_instructions"] = f"Tank Type also permitted: {tank_permitted[tank_type_str]}"
+            if contact_details.get("email"):
+                first_name = contact_details.get("name", "User")
+                send_brevo_template_email(contact_details["email"], first_name, cargo_input, tank_type_str)
 
         # Send to FormBold
         formbold_url = "https://formbold.com/s/oYkGv"
