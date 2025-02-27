@@ -3,7 +3,9 @@ from flask_cors import CORS
 import pandas as pd
 import requests
 import numpy as np
-import os #Add this import
+import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 CORS(app)
@@ -38,9 +40,15 @@ tank_permitted = {
     "T21": "T22",
 }
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY") # Get API Key from Environment Variables.
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
-SENDER_EMAIL = "your_sender_email@example.com" #Replace with your sender email
+SENDER_EMAIL = "info@bolttanks.com"
+
+# Google Sheets Configuration
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+CREDENTIALS_FILE = "your-service-account-credentials.json"
+SPREADSHEET_ID = "1geFLxGjdEUUj2Ua9VDhDlQeDLDg-ZNuErz7KId-8_yY"
+WORKSHEET_NAME = "Sheet1"
 
 def send_brevo_email(to_email, subject, content):
     headers = {
@@ -56,10 +64,31 @@ def send_brevo_email(to_email, subject, content):
     }
     try:
         response = requests.post(BREVO_ENDPOINT, headers=headers, json=payload)
-        response.raise_for_status() #Raise error for bad status codes.
+        response.raise_for_status()
         print(f"Email sent successfully to {to_email}")
     except requests.exceptions.RequestException as e:
         print(f"Failed to send email to {to_email}. Error: {e}")
+
+def append_to_excel(data):
+    try:
+        new_row = pd.DataFrame([data])
+        global df
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_excel("ISO_Tank_Finder.xlsx", index=False)
+        print("Data appended to Excel successfully.")
+    except Exception as e:
+        print(f"Failed to append data to Excel. Error: {e}")
+
+def append_to_google_sheet(data):
+    try:
+        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, SCOPE)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SPREADSHEET_ID).worksheet(WORKSHEET_NAME)
+        row = [data.get("Cargo", ""), data.get("Tank Type", ""), data.get("Name", ""), data.get("Email", ""), data.get("Phone", "")]
+        sheet.append_row(row)
+        print("Data appended to Google Sheet successfully.")
+    except Exception as e:
+        print(f"Failed to append data to Google Sheet. Error: {e}")
 
 @app.route("/", methods=["POST"])
 def index():
@@ -98,18 +127,4 @@ def index():
         else:
             tank_type_str = str(tank_type)
             print(f"Tank Type: {tank_type_str}")
-            response_data = {"tank_type": tank_type_str, "contact_details": contact_details}
-
-            if tank_type_str in tank_permitted:
-                response_data["portable_tank_instructions"] = f"Tank Type also permitted: {tank_permitted[tank_type_str]}"
-            if contact_details.get("email"): #Send email if email is provided.
-                subject = "ISO Tank Finder Result"
-                content = f"Tank Type: {tank_type_str}\nPortable Tank Instructions: {tank_permitted.get(tank_type_str, 'None')}"
-                send_brevo_email(contact_details["email"], subject, content)
-
-        # Send to FormBold
-        formbold_url = "https://formbold.com/s/oYkGv"
-        try:
-            requests.post(formbold_url, json=response_data)
-        except Exception as formbold_error:
-            print(f"Tank Type: {tank_type_str}")
+            response_data
