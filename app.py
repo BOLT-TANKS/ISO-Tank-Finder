@@ -56,13 +56,24 @@ def send_brevo_email(name, cargo, tank_type, email):
         "to": [{"email": email}],
         "templateId": BREVO_TEMPLATE_ID,
         "params": {
-            "First Name": name,
+            "First_Name": name,
             "Cargo": cargo,
-            "Tank Type": tank_type,
+            "Tank": tank_type,
         },
     }
-    response = requests.post(url, json=payload, headers=headers)
-    return response.status_code == 202
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        print("Email sent successfully!")
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending email: {e}")
+        if response is not None:
+            print(f"Response content: {response.content}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
 
 def append_to_sheet(data):
     try:
@@ -123,7 +134,7 @@ def index():
         if tank_type != "Cargo Not Found" and tank_type != "Not Found":
             send_brevo_email(name, cargo_input, tank_type, email)
 
-        response_data = {"tank_type": tank_type, "contact_details": contact_details}
+        response_data = {"tank_type": tank_type, "contact_details":contact_details}
         if portable_instructions:
             response_data["portable_instructions"] = portable_instructions
 
