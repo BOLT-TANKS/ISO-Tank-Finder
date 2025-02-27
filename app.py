@@ -1,94 +1,57 @@
 from flask import Flask, request, jsonify
 import pandas as pd
-from flask_cors import CORS
-import requests
-import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import requests
 
 app = Flask(__name__)
-CORS(app)
 
-try:
-    df = pd.read_excel("ISO_Tank_Finder.xlsx")
-    df["Cargo Name"] = df["Cargo Name"].str.strip()
-except FileNotFoundError:
-    print("Error: ISO_Tank_Finder.xlsx not found.")
-    exit()
+# Google Sheets Authentication
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("Cargo Tank Data").sheet1
 
+# Load Cargo Data from Excel
+excel_path = "cargo_data.xlsx"
+df = pd.read_excel(excel_path)
+
+# Tank Instructions Data
 TANK_INSTRUCTIONS = {
-    "T1": "T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T2": "T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T3": "T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T4": "T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T5": "T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T6": "T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T7": "T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T8": "T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T9": "T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22",
-    "T10": "T11, T19, T20, T21, T22",
-    "T12": "T14, T16, T18, T19, T20, T21, T22",
-    "T13": "T19, T20, T21, T22",
-    "T15": "T16, T17, T18, T19, T20, T21, T22",
-    "T16": "T17, T18, T19, T20, T21, T22",
-    "T17": "T18, T19, T20, T21, T22",
-    "T18": "T19, T20, T21, T22",
-    "T19": "T20, T22",
+    "T11": "T14, T20, T22",
+    "T14": "T20, T22",
     "T20": "T22",
-    "T21": "T22",
+    "T22": "No additional instructions"
 }
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-BREVO_TEMPLATE_ID = int(os.environ.get("BREVO_TEMPLATE_ID"))
-GOOGLE_CREDENTIALS_GIST_URL = os.environ.get("GOOGLE_CREDENTIALS_GIST_URL")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-SHEET_ID = os.environ.get("SHEET_ID")
-
-def send_brevo_email(name, cargo, tank_type, email):
-    url = "https://api.brevo.com/v3/smtp/templates/" + str(BREVO_TEMPLATE_ID) + "/send"
+# Function to send email via Brevo
+def send_brevo_email(first_name, cargo, tank_type, email):
+    brevo_api_url = "https://api.brevo.com/v3/smtp/email"
+    brevo_api_key = "YOUR_BREVO_API_KEY"
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "api-key": BREVO_API_KEY,
+        "api-key": brevo_api_key,
     }
-    payload = {
-        "sender": {"email": SENDER_EMAIL, "name": "BOLT"},
+    data = {
+        "sender": {"name": "BOLT", "email": "noreply@bolt.com"},
         "to": [{"email": email}],
-        "templateId": BREVO_TEMPLATE_ID,
-        "params": {
-            "First_Name": name,
-            "Cargo": cargo,
-            "Tank": tank_type,
-        },
+        "subject": "Your Cargo Tank Compatibility Results",
+        "htmlContent": f"""
+        <p>Dear {first_name},</p>
+        <p>Based on your input, the recommended tank type for your cargo ({cargo}) is: <strong>{tank_type}</strong>.</p>
+        <p>For more details, please contact us.</p>
+        <p>Best Regards,<br>BOLT Team</p>
+        """
     }
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        print("Email sent successfully!")
-        return True
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending email: {e}")
-        if response is not None:
-            print(f"Response content: {response.content}")
-        return False
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return False
+    response = requests.post(brevo_api_url, json=data, headers=headers)
+    return response.status_code
 
+# Function to append data to Google Sheet
 def append_to_sheet(data):
-    try:
-        response = requests.get(GOOGLE_CREDENTIALS_GIST_URL)
-        response.raise_for_status()
-        credentials_json = response.json()
+    sheet.append_row(data)
 
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_json, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_ID).sheet1
-        sheet.append_row(data)
-    except Exception as e:
-        print(f"Error appending to sheet: {e}")
-
+# API Endpoint
 @app.route("/", methods=["POST"])
 def index():
     try:
@@ -100,59 +63,53 @@ def index():
             return jsonify({"error": "Cargo input is required"}), 400
 
         contact_details = {
-            "name": data.get("first_name", "") + " " + data.get("last_name", ""),
+            "first_name": data.get("first_name", ""),
+            "last_name": data.get("last_name", ""),
             "email": data.get("email", ""),
-            "phone": data.get("contact_number", ""),
-            "location": data.get("location", "")
+            "phone": data.get("phone", ""),
+            "location": data.get("location", ""),
         }
-        name = contact_details["name"]
+        first_name = contact_details["first_name"]
+        last_name = contact_details["last_name"]
         email = contact_details["email"]
+        phone = contact_details["phone"]
+        location = contact_details["location"]
 
+        # Identify tank type
         try:
             un_number = int(cargo_input)
-            tank_data = df.loc[df["UN No."] == un_number, "ISO Tank Type"]
-
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-                if pd.isna(tank_type):
-                    tank_type = "Not Found"
-            else:
-                tank_type = "Cargo Not Found"
+            tank_data = df.loc[df["UN No."].astype(str) == str(un_number), "ISO Tank Type"]
         except ValueError:
-            tank_data = df.loc [df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
+            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
 
-            if not tank_data.empty:
-                tank_type = tank_data.iloc[0]
-                if pd.isna(tank_type):
-                    tank_type = "Not Found"
-            else:
-                tank_type = "Cargo Not Found"
+        if not tank_data.empty:
+            tank_type = tank_data.iloc[0]
+            if pd.isna(tank_type):
+                tank_type = "Not Found"
+        else:
+            tank_type = "Cargo Not Found"
 
         portable_instructions = None
         if tank_type in TANK_INSTRUCTIONS:
             portable_instructions = "Portable tank instructions also permitted: " + TANK_INSTRUCTIONS[tank_type]
 
-        if tank_type != "Cargo Not Found" and tank_type != "Not Found":
-            send_brevo_email(name, cargo_input, tank_type, email)
+        if tank_type not in ["Cargo Not Found", "Not Found"]:
+            send_brevo_email(first_name, cargo_input, tank_type, email)
 
-        response_data = {"tank_type": tank_type, "contact_details":contact_details}
+        response_data = {
+            "tank_type": tank_type,
+            "contact_details": contact_details
+        }
         if portable_instructions:
             response_data["portable_instructions"] = portable_instructions
 
-        append_to_sheet([
-            data.get("first_name", ""),
-            data.get("last_name", ""),
-            data.get("contact_number", ""),
-            data.get("email", ""),
-            data.get("location", ""),
-            cargo_input,
-            tank_type
-        ])
+        # Append all details to the Google Sheet
+        append_to_sheet([first_name, last_name, email, phone, location, cargo_input, tank_type])
 
         return jsonify(response_data)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
     app.run(debug=True)
-            
