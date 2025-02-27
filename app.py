@@ -119,7 +119,7 @@ def index():
             else:
                 tank_type = "Cargo Not Found"
         except ValueError:
-            tank_data = df.loc[df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
+            tank_data = df.loc [df["Cargo Name"].str.lower() == cargo_input.lower(), "ISO Tank Type"]
 
             if not tank_data.empty:
                 tank_type = tank_data.iloc[0]
@@ -133,7 +133,7 @@ def index():
             portable_instructions = "Portable tank instructions also permitted: " + TANK_INSTRUCTIONS[tank_type]
 
         if tank_type != "Cargo Not Found" and tank_type != "Not Found":
-            send_brevo_email(name, cargo, tank_type, email)
+            send_brevo_email(name, cargo_input, tank_type, email)
 
         response_data = {"tank_type": tank_type, "contact_details":contact_details}
         if portable_instructions:
@@ -155,3 +155,4 @@ def index():
 
 if __name__ == "__main__":
     app.run(debug=True)
+            
