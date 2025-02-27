@@ -100,9 +100,10 @@ def index():
             return jsonify({"error": "Cargo input is required"}), 400
 
         contact_details = {
-            "name": data.get("name", ""),
+            "name": data.get("first_name", "") + " " + data.get("last_name", ""),
             "email": data.get("email", ""),
-            "phone": data.get("phone", ""),
+            "phone": data.get("contact_number", ""),
+            "location": data.get("location", "")
         }
         name = contact_details["name"]
         email = contact_details["email"]
@@ -132,13 +133,21 @@ def index():
             portable_instructions = "Portable tank instructions also permitted: " + TANK_INSTRUCTIONS[tank_type]
 
         if tank_type != "Cargo Not Found" and tank_type != "Not Found":
-            send_brevo_email(name, cargo_input, tank_type, email)
+            send_brevo_email(name, cargo, tank_type, email)
 
         response_data = {"tank_type": tank_type, "contact_details":contact_details}
         if portable_instructions:
             response_data["portable_instructions"] = portable_instructions
 
-        append_to_sheet([name, email, data.get("phone", ""), cargo_input, tank_type])
+        append_to_sheet([
+            data.get("first_name", ""),
+            data.get("last_name", ""),
+            data.get("contact_number", ""),
+            data.get("email", ""),
+            data.get("location", ""),
+            cargo_input,
+            tank_type
+        ])
 
         return jsonify(response_data)
     except Exception as e:
