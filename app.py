@@ -44,37 +44,27 @@ GOOGLE_CREDENTIALS_GIST_URL = os.environ.get("GOOGLE_CREDENTIALS_GIST_URL")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 SHEET_ID = os.environ.get("SHEET_ID")
 
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
+
 def send_brevo_email(name, cargo, tank_type, email):
-    url = "https://api.brevo.com/v3/smtp/templates/" + str(BREVO_TEMPLATE_ID) + "/send"
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": BREVO_API_KEY,
-    }
-    payload = {
-        "sender": {"email": SENDER_EMAIL, "name": "BOLT"},
-        "to": [{"email": email}],
-        "templateId": BREVO_TEMPLATE_ID,
-        "params": {
-            "First_Name": name,
-            "Cargo": cargo,
-            "Tank": tank_type,
-        },
-    }
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = BREVO_API_KEY  # Use the environment variable
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    sender = {"name": "BOLT", "email": SENDER_EMAIL}
+    to = [{"email": email}]
+    params = {"First_Name": name, "Cargo": cargo, "Tank": tank_type}
+    template_id = BREVO_TEMPLATE_ID  # Use the environment variable
+
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(to=to, sender=sender, template_id=template_id, params=params)
+
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
+        api_response = api_instance.send_transac_email(send_smtp_email)
         print("Email sent successfully!")
         return True
-    except requests.exceptions.RequestException as e:
+    except ApiException as e:
         print(f"Error sending email: {e}")
-        if response is not None:
-            print(f"Response content: {response.content}")
         return False
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return False
-
 def append_to_sheet(data):
     try:
         response = requests.get(GOOGLE_CREDENTIALS_GIST_URL)
