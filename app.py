@@ -124,7 +124,7 @@ def index():
                 tank_type = tank_data.iloc[0]
                 if pd.isna(tank_type):
                     tank_type = "Not Found"
-            else tank_type = "Cargo Not Found"
+            else: tank_type = "Cargo Not Found"
         except ValueError:
             # Fuzzy matching for cargo name
             cargo_names = df["Cargo Name"].str.lower().tolist()
