@@ -8,3 +8,5 @@ gunicorn
 openpyxl
 numpy
 sib-api-v3-sdk
+fuzzywuzzy
+python-Levenshtein
